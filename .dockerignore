@@ -1,0 +1,18 @@
+# syntax=docker/dockerfile:1
+# .dockerignore keeps build context small
+
+.git
+.gitignore
+.env
+.env.*
+!.env.example
+bin/
+dist/
+coverage.out
+coverage.html
+*.md
+.vscode/
+.idea/
+docker-compose.yml
+.golangci.yml
+Makefile
