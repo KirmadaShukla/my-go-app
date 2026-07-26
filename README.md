@@ -41,12 +41,25 @@ make run
 # Register
 curl -s -X POST http://localhost:8080/auth/register \
   -H 'Content-Type: application/json' \
-  -d '{"email":"you@example.com","password":"secret123"}'
+  -d '{
+    "name":"Riya Sharma",
+    "email":"you@example.com",
+    "password":"secret123",
+    "gender":"female",
+    "mother_name":"Anita Sharma",
+    "father_name":"Rahul Sharma",
+    "mobile_number":"9876543210",
+    "child_age":8,
+    "child_class":"3"
+  }'
 
 # Login
 curl -s -X POST http://localhost:8080/auth/login \
   -H 'Content-Type: application/json' \
   -d '{"email":"you@example.com","password":"secret123"}'
+
+# Invalid register returns field-level validation errors, e.g.
+# {"error":"validation failed","details":[{"field":"email","message":"email must be a valid email"}]}
 
 # Me (protected)
 curl -s http://localhost:8080/auth/me \

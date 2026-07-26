@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"errors"
-	"fmt"
 	"strings"
 	"time"
 
@@ -36,20 +35,37 @@ type AuthResult struct {
 	ExpiresAt time.Time
 }
 
-func (s *AuthService) Register(ctx context.Context, email, password string) (*AuthResult, error) {
-	email = strings.TrimSpace(strings.ToLower(email))
-	if err := validateCredentials(email, password); err != nil {
-		return nil, err
-	}
+// RegisterInput holds all fields required to create an account.
+type RegisterInput struct {
+	Name         string
+	Email        string
+	Password     string
+	Gender       string
+	MotherName   string
+	FatherName   string
+	MobileNumber string
+	ChildAge     int
+	ChildClass   string
+}
 
-	hash, err := auth.HashPassword(password)
+func (s *AuthService) Register(ctx context.Context, in RegisterInput) (*AuthResult, error) {
+	in.Email = strings.ToLower(strings.TrimSpace(in.Email))
+
+	hash, err := auth.HashPassword(in.Password)
 	if err != nil {
 		return nil, err
 	}
 
 	user := &model.User{
-		Email:        email,
-		PasswordHash: hash,
+		Name:         in.Name,
+		Email:        in.Email,
+		Gender:       in.Gender,
+		MotherName:   in.MotherName,
+		FatherName:   in.FatherName,
+		MobileNumber: in.MobileNumber,
+		ChildAge:     in.ChildAge,
+		ChildClass:   in.ChildClass,
+		Password:     hash,
 	}
 
 	if err := s.users.Create(ctx, user); err != nil {
@@ -69,9 +85,6 @@ func (s *AuthService) Register(ctx context.Context, email, password string) (*Au
 
 func (s *AuthService) Login(ctx context.Context, email, password string) (*AuthResult, error) {
 	email = strings.TrimSpace(strings.ToLower(email))
-	if email == "" || password == "" {
-		return nil, fmt.Errorf("%w: email and password are required", ErrValidation)
-	}
 
 	user, err := s.users.FindByEmail(ctx, email)
 	if err != nil {
@@ -81,7 +94,7 @@ func (s *AuthService) Login(ctx context.Context, email, password string) (*AuthR
 		return nil, err
 	}
 
-	if !auth.CheckPassword(user.PasswordHash, password) {
+	if !auth.CheckPassword(user.Password, password) {
 		return nil, ErrInvalidCredentials
 	}
 
@@ -102,16 +115,6 @@ func (s *AuthService) Me(ctx context.Context, userID uuid.UUID) (*model.User, er
 		return nil, err
 	}
 	return user, nil
-}
-
-func validateCredentials(email, password string) error {
-	if email == "" || !strings.Contains(email, "@") {
-		return fmt.Errorf("%w: valid email is required", ErrValidation)
-	}
-	if len(password) < 8 {
-		return fmt.Errorf("%w: password must be at least 8 characters", ErrValidation)
-	}
-	return nil
 }
 
 func isUniqueViolation(err error) bool {
