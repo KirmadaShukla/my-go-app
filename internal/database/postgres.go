@@ -5,8 +5,6 @@ import (
 	"log/slog"
 	"time"
 
-	"my-go-app/internal/model"
-
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	gormlogger "gorm.io/gorm/logger"
@@ -31,7 +29,7 @@ func Connect(databaseURL string, appLogger *slog.Logger) (*gorm.DB, error) {
 	sqlDB.SetMaxIdleConns(5)
 	sqlDB.SetConnMaxLifetime(30 * time.Minute)
 
-	if err := db.AutoMigrate(&model.User{}); err != nil {
+	if err := Migrate(db); err != nil {
 		return nil, fmt.Errorf("migrate: %w", err)
 	}
 

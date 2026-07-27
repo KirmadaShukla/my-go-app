@@ -21,7 +21,12 @@ type User struct {
 	Password     string    `gorm:"size:255;not null" json:"-"`
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
+
+	TutorSessions []TutorSession       `gorm:"foreignKey:UserID" json:"-"`
+	TutorMemories []TutorSubjectMemory `gorm:"foreignKey:UserID" json:"-"`
 }
+
+func (User) TableName() string { return "users" }
 
 func (u *User) BeforeCreate(tx *gorm.DB) error {
 	if u.ID == uuid.Nil {

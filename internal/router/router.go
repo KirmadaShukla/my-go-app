@@ -23,6 +23,7 @@ func New(d Deps) http.Handler {
 
 	registerHealth(mux, d)
 	registerAuth(mux, d)
+	registerTutor(mux, d)
 	// registerUsers(mux, d)
 	// registerProducts(mux, d)
 

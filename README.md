@@ -35,6 +35,15 @@ cp .env.example .env
 make run
 ```
 
+## Postman
+
+Import [`postman/my-go-app.postman_collection.json`](postman/my-go-app.postman_collection.json).
+
+Suggested order:
+1. Auth → Register (or Login) — saves `token`
+2. Tutor → Start or Resume Session — saves `sessionId`
+3. Tutor → Voice Turn — attach an audio file in `audio`
+
 ## Auth API
 
 ```bash
@@ -66,6 +75,39 @@ curl -s http://localhost:8080/auth/me \
   -H "Authorization: Bearer <token>"
 ```
 
+## Kids tutor API (voice only, classes 1–10)
+
+Subjects: `maths`, `science`, `english`, `activities`.
+
+Students learn by talking. History is stored in Postgres (`tutor_sessions`, `tutor_messages`, `tutor_subject_memories`).
+Starting the same subject again resumes the active session when possible.
+
+```bash
+# Subjects
+curl -s http://localhost:8080/tutor/subjects
+
+# Start or resume a voice session (JWT required)
+curl -s -X POST http://localhost:8080/tutor/sessions \
+  -H "Authorization: Bearer <token>" \
+  -H 'Content-Type: application/json' \
+  -d '{"subject":"maths","language":"Hindi"}'
+
+# Force a brand-new session
+curl -s -X POST http://localhost:8080/tutor/sessions \
+  -H "Authorization: Bearer <token>" \
+  -H 'Content-Type: application/json' \
+  -d '{"subject":"maths","language":"Hindi","force_new":true}'
+
+# Voice discussion (Whisper → GPT → TTS)
+curl -s -X POST http://localhost:8080/tutor/sessions/<session_id>/voice \
+  -H "Authorization: Bearer <token>" \
+  -F audio=@recording.webm
+```
+
+Set `OPENAI_API_KEY` in `.env` before using tutor endpoints.
+
+Schema reference: `migrations/000001_tutor_history.up.sql` (applied via GORM AutoMigrate on startup).
+
 ## Configuration
 
 | Variable | Default | Description |
@@ -73,9 +115,14 @@ curl -s http://localhost:8080/auth/me \
 | `DATABASE_URL` | local postgres URL | Postgres DSN for GORM |
 | `JWT_SECRET` | `dev-only-change-me` | Required strong secret in production |
 | `JWT_EXPIRY` | `24h` | Access token lifetime |
+| `OPENAI_API_KEY` | empty | Required for tutor voice |
+| `OPENAI_CHAT_MODEL` | `gpt-4o-mini` | Chat model |
+| `OPENAI_TTS_MODEL` | `tts-1` | Text-to-speech model |
+| `OPENAI_TTS_VOICE` | `nova` | Friendly TTS voice |
 | `APP_ENV` | `development` | Environment name |
 | `HTTP_ADDR` | `:8080` | Listen address |
 | `LOG_LEVEL` | `info` | `debug`, `info`, `warn`, `error` |
+| `HTTP_WRITE_TIMEOUT` | `120s` | Raised for voice round-trips |
 
 ## Full stack (API + Postgres)
 

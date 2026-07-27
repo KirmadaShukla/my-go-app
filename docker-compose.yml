@@ -33,6 +33,11 @@ services:
       DATABASE_URL: postgres://postgres:postgres@postgres:5432/mygoapp?sslmode=disable
       JWT_SECRET: change-me-in-real-deployments-use-long-random
       JWT_EXPIRY: 24h
+      HTTP_WRITE_TIMEOUT: 120s
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_CHAT_MODEL: gpt-4o-mini
+      OPENAI_TTS_MODEL: tts-1
+      OPENAI_TTS_VOICE: nova
     depends_on:
       postgres:
         condition: service_healthy

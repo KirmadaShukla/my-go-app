@@ -22,6 +22,11 @@ type Config struct {
 
 	JWTSecret string
 	JWTExpiry time.Duration
+
+	OpenAIAPIKey    string
+	OpenAIChatModel string
+	OpenAITTSModel  string
+	OpenAITTSVoice  string
 }
 
 func Load() (*Config, error) {
@@ -30,11 +35,15 @@ func Load() (*Config, error) {
 		HTTPAddr:        getEnv("HTTP_ADDR", ":8080"),
 		ShutdownTimeout: getDuration("SHUTDOWN_TIMEOUT", 15*time.Second),
 		ReadTimeout:     getDuration("HTTP_READ_TIMEOUT", 10*time.Second),
-		WriteTimeout:    getDuration("HTTP_WRITE_TIMEOUT", 30*time.Second),
+		WriteTimeout:    getDuration("HTTP_WRITE_TIMEOUT", 120*time.Second),
 		IdleTimeout:     getDuration("HTTP_IDLE_TIMEOUT", 60*time.Second),
 		DatabaseURL:     getEnv("DATABASE_URL", "postgres://pranjalshukla@localhost:5432/mygoapp?sslmode=disable"),
 		JWTSecret:       getEnv("JWT_SECRET", "dev-only-change-me"),
 		JWTExpiry:       getDuration("JWT_EXPIRY", 24*time.Hour),
+		OpenAIAPIKey:    getEnv("OPENAI_API_KEY", ""),
+		OpenAIChatModel: getEnv("OPENAI_CHAT_MODEL", "gpt-4o-mini"),
+		OpenAITTSModel:  getEnv("OPENAI_TTS_MODEL", "tts-1"),
+		OpenAITTSVoice:  getEnv("OPENAI_TTS_VOICE", "nova"),
 	}
 
 	level, err := parseLogLevel(getEnv("LOG_LEVEL", "info"))

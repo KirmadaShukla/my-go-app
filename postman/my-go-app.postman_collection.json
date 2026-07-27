@@ -1,0 +1,401 @@
+{
+  "info": {
+    "_postman_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "name": "my-go-app API",
+    "description": "Postman collection for health, auth, and voice-only kids tutor APIs.\n\n## Setup\n1. Start API: `make run`\n2. Set collection variable `baseUrl` (default `http://localhost:8080`)\n3. Run **Auth → Register** (or Login)\n4. Token is auto-saved to `token`\n5. Run **Tutor → Start/Resume Session** — `sessionId` is auto-saved\n6. Run **Tutor → Voice Turn** and attach an audio file in the `audio` field\n\n## Notes\n- Tutor voice needs `OPENAI_API_KEY` in `.env`\n- Voice can take 5–30+ seconds; collection timeout is raised\n- No polling needed: one request returns full reply + audio",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080" },
+    { "key": "token", "value": "" },
+    { "key": "sessionId", "value": "" },
+    { "key": "email", "value": "riya.student@example.com" },
+    { "key": "password", "value": "secret123" }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Root",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/"
+          }
+        },
+        {
+          "name": "Healthz (liveness)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/healthz"
+          }
+        },
+        {
+          "name": "Readyz (readiness / DB)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/readyz"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  const data = pm.response.json();",
+                  "  if (data.token) {",
+                  "    pm.collectionVariables.set('token', data.token);",
+                  "    console.log('Saved token from Register');",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Riya Sharma\",\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\",\n  \"gender\": \"female\",\n  \"mother_name\": \"Anita Sharma\",\n  \"father_name\": \"Rahul Sharma\",\n  \"mobile_number\": \"9876543210\",\n  \"child_age\": 8,\n  \"child_class\": \"3\"\n}"
+            },
+            "url": "{{baseUrl}}/auth/register",
+            "description": "Creates a student account. On success, saves `token` automatically."
+          }
+        },
+        {
+          "name": "Register (validation error example)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"\",\n  \"email\": \"bad-email\",\n  \"password\": \"short\",\n  \"gender\": \"unknown\",\n  \"mother_name\": \"\",\n  \"father_name\": \"\",\n  \"mobile_number\": \"123\",\n  \"child_age\": 0,\n  \"child_class\": \"12\"\n}"
+            },
+            "url": "{{baseUrl}}/auth/register",
+            "description": "Expect 400 with field-level validation details."
+          }
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  const data = pm.response.json();",
+                  "  if (data.token) {",
+                  "    pm.collectionVariables.set('token', data.token);",
+                  "    console.log('Saved token from Login');",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}"
+            },
+            "url": "{{baseUrl}}/auth/login",
+            "description": "Logs in and saves `token` automatically."
+          }
+        },
+        {
+          "name": "Me",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                { "key": "token", "value": "{{token}}", "type": "string" }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/auth/me",
+            "description": "Returns the authenticated student profile."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Tutor (Voice)",
+      "item": [
+        {
+          "name": "List Subjects",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/tutor/subjects",
+            "description": "Public list of subjects and supported classes 1–10."
+          }
+        },
+        {
+          "name": "Start or Resume Session (Maths)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  const data = pm.response.json();",
+                  "  if (data.session_id) {",
+                  "    pm.collectionVariables.set('sessionId', data.session_id);",
+                  "    console.log('Saved sessionId:', data.session_id, 'resumed=', data.resumed);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                { "key": "token", "value": "{{token}}", "type": "string" }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"subject\": \"maths\",\n  \"language\": \"Hindi\"\n}"
+            },
+            "url": "{{baseUrl}}/tutor/sessions",
+            "description": "Starts a maths voice session or resumes the latest active one. Saves `sessionId`. Response includes spoken greeting as `audio_base64`."
+          }
+        },
+        {
+          "name": "Force New Session (Maths)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  const data = pm.response.json();",
+                  "  if (data.session_id) {",
+                  "    pm.collectionVariables.set('sessionId', data.session_id);",
+                  "    console.log('Saved new sessionId:', data.session_id);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                { "key": "token", "value": "{{token}}", "type": "string" }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"subject\": \"maths\",\n  \"language\": \"Hindi\",\n  \"force_new\": true\n}"
+            },
+            "url": "{{baseUrl}}/tutor/sessions",
+            "description": "Always creates a brand-new maths session."
+          }
+        },
+        {
+          "name": "Start Session (Science)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  const data = pm.response.json();",
+                  "  if (data.session_id) {",
+                  "    pm.collectionVariables.set('sessionId', data.session_id);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                { "key": "token", "value": "{{token}}", "type": "string" }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"subject\": \"science\",\n  \"language\": \"English\"\n}"
+            },
+            "url": "{{baseUrl}}/tutor/sessions"
+          }
+        },
+        {
+          "name": "Start Session (English)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  const data = pm.response.json();",
+                  "  if (data.session_id) {",
+                  "    pm.collectionVariables.set('sessionId', data.session_id);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                { "key": "token", "value": "{{token}}", "type": "string" }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"subject\": \"english\",\n  \"language\": \"Hindi\"\n}"
+            },
+            "url": "{{baseUrl}}/tutor/sessions"
+          }
+        },
+        {
+          "name": "Start Session (Activities)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  const data = pm.response.json();",
+                  "  if (data.session_id) {",
+                  "    pm.collectionVariables.set('sessionId', data.session_id);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                { "key": "token", "value": "{{token}}", "type": "string" }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"subject\": \"activities\",\n  \"language\": \"Hindi\"\n}"
+            },
+            "url": "{{baseUrl}}/tutor/sessions"
+          }
+        },
+        {
+          "name": "Start Session (invalid subject)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                { "key": "token", "value": "{{token}}", "type": "string" }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"subject\": \"history\",\n  \"language\": \"Hindi\"\n}"
+            },
+            "url": "{{baseUrl}}/tutor/sessions",
+            "description": "Expect 400 validation error for invalid subject."
+          }
+        },
+        {
+          "name": "Voice Turn",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.request.timeout = 120000;"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                { "key": "token", "value": "{{token}}", "type": "string" }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "audio",
+                  "description": "Upload a short audio file (webm/mp3/wav/m4a). Student speaking a maths question.",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/tutor/sessions/{{sessionId}}/voice",
+            "description": "Sends student voice audio.\n\nReturns in ONE response:\n- student_text\n- reply_text\n- audio_base64 (mp3)\n- audio_mime\n\nNo polling required. Can take several seconds."
+          }
+        }
+      ]
+    }
+  ]
+}

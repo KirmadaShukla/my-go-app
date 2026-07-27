@@ -27,6 +27,8 @@ func newValidator() *validator.Validate {
 	})
 	_ = v.RegisterValidation("mobile", validateMobile)
 	_ = v.RegisterValidation("gender", validateGender)
+	_ = v.RegisterValidation("subject", validateSubject)
+	_ = v.RegisterValidation("child_class", validateChildClass)
 	return v
 }
 
@@ -52,6 +54,30 @@ func validateMobile(fl validator.FieldLevel) bool {
 func validateGender(fl validator.FieldLevel) bool {
 	switch strings.ToLower(strings.TrimSpace(fl.Field().String())) {
 	case "male", "female", "other":
+		return true
+	default:
+		return false
+	}
+}
+
+func validateSubject(fl validator.FieldLevel) bool {
+	switch strings.ToLower(strings.TrimSpace(fl.Field().String())) {
+	case "maths", "science", "english", "activities":
+		return true
+	default:
+		return false
+	}
+}
+
+func validateChildClass(fl validator.FieldLevel) bool {
+	raw := strings.ToLower(strings.TrimSpace(fl.Field().String()))
+	raw = strings.ReplaceAll(raw, "class", "")
+	raw = strings.ReplaceAll(raw, "std", "")
+	raw = strings.TrimSpace(raw)
+	raw = strings.TrimRight(raw, "stndrh")
+	raw = strings.TrimSpace(raw)
+	switch raw {
+	case "1", "2", "3", "4", "5", "6", "7", "8", "9", "10":
 		return true
 	default:
 		return false
@@ -139,6 +165,10 @@ func fieldMessage(fe validator.FieldError) string {
 		return fmt.Sprintf("%s must be a valid mobile number (10-15 digits)", fe.Field())
 	case "gender":
 		return fmt.Sprintf("%s must be one of: male, female, other", fe.Field())
+	case "subject":
+		return fmt.Sprintf("%s must be one of: maths, science, english, activities", fe.Field())
+	case "child_class":
+		return fmt.Sprintf("%s must be a class from 1 to 10", fe.Field())
 	case "oneof":
 		return fmt.Sprintf("%s must be one of: %s", fe.Field(), strings.ReplaceAll(fe.Param(), " ", ", "))
 	default:

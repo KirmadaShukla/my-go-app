@@ -12,7 +12,7 @@ import (
 )
 
 func TestHealthz(t *testing.T) {
-	h := handler.New(slog.New(slog.NewTextHandler(os.Stderr, nil)), nil, nil)
+	h := handler.New(slog.New(slog.NewTextHandler(os.Stderr, nil)), nil, nil, nil)
 	req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
 	rr := httptest.NewRecorder()
 

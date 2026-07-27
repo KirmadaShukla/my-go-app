@@ -11,6 +11,7 @@ import (
 	"my-go-app/internal/auth"
 	"my-go-app/internal/config"
 	"my-go-app/internal/handler"
+	"my-go-app/internal/openai"
 	"my-go-app/internal/repository"
 	"my-go-app/internal/router"
 	"my-go-app/internal/service"
@@ -27,8 +28,11 @@ type Server struct {
 func New(cfg *config.Config, logger *slog.Logger, db *gorm.DB) *Server {
 	tokens := auth.NewTokenManager(cfg.JWTSecret, cfg.JWTExpiry)
 	users := repository.NewUserRepository(db)
+	tutors := repository.NewTutorRepository(db)
+	ai := openai.NewClient(cfg.OpenAIAPIKey, cfg.OpenAIChatModel, cfg.OpenAITTSModel, cfg.OpenAITTSVoice)
 	authSvc := service.NewAuthService(users, tokens)
-	h := handler.New(logger, db, authSvc)
+	tutorSvc := service.NewTutorService(users, tutors, ai)
+	h := handler.New(logger, db, authSvc, tutorSvc)
 
 	httpHandler := router.New(router.Deps{
 		Handler: h,

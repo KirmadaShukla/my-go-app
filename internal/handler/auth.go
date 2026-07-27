@@ -21,7 +21,7 @@ type RegisterRequest struct {
 	FatherName   string `json:"father_name" validate:"required,min=1,max=255"`
 	MobileNumber string `json:"mobile_number" validate:"required,mobile"`
 	ChildAge     int    `json:"child_age" validate:"required,gte=1,lte=25"`
-	ChildClass   string `json:"child_class" validate:"required,min=1,max=50"`
+	ChildClass   string `json:"child_class" validate:"required,child_class"`
 }
 
 // LoginRequest is the Joi-style schema for POST /auth/login.

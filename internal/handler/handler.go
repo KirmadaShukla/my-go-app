@@ -14,10 +14,11 @@ type Handler struct {
 	logger *slog.Logger
 	db     *gorm.DB
 	auth   *service.AuthService
+	tutor  *service.TutorService
 }
 
-func New(logger *slog.Logger, db *gorm.DB, auth *service.AuthService) *Handler {
-	return &Handler{logger: logger, db: db, auth: auth}
+func New(logger *slog.Logger, db *gorm.DB, auth *service.AuthService, tutor *service.TutorService) *Handler {
+	return &Handler{logger: logger, db: db, auth: auth, tutor: tutor}
 }
 
 func decodeJSON(r *http.Request, dst any) error {
