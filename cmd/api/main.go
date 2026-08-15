@@ -11,6 +11,8 @@ import (
 	"my-go-app/internal/config"
 	"my-go-app/internal/database"
 	"my-go-app/internal/server"
+
+	"github.com/lmittmann/tint"
 )
 
 // Set via -ldflags at build time.
@@ -27,9 +29,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
-		Level: cfg.LogLevel,
-	}))
+	logger := slog.New(newLogHandler(cfg))
 	slog.SetDefault(logger)
 
 	db, err := database.Connect(cfg.DatabaseURL, logger)
@@ -68,4 +68,11 @@ func main() {
 	}
 
 	logger.Info("server stopped", "uptime", time.Since(srv.StartedAt()).String())
+}
+
+func newLogHandler(cfg *config.Config) slog.Handler {
+	return tint.NewHandler(os.Stdout, &tint.Options{
+		Level:      cfg.LogLevel,
+		TimeFormat: time.Kitchen,
+	})
 }
