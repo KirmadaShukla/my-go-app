@@ -34,10 +34,13 @@ services:
       JWT_SECRET: change-me-in-real-deployments-use-long-random
       JWT_EXPIRY: 24h
       HTTP_WRITE_TIMEOUT: 120s
+      DEFAULT_CHAT_MODEL: ${DEFAULT_CHAT_MODEL:-gemini}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_CHAT_MODEL: ${GEMINI_CHAT_MODEL:-gemini-2.5-flash-lite}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      OPENAI_CHAT_MODEL: gpt-4o-mini
-      OPENAI_TTS_MODEL: tts-1
-      OPENAI_TTS_VOICE: nova
+      OPENAI_CHAT_MODEL: ${OPENAI_CHAT_MODEL:-gpt-4o-mini}
+      OPENAI_TTS_MODEL: ${OPENAI_TTS_MODEL:-tts-1}
+      OPENAI_TTS_VOICE: ${OPENAI_TTS_VOICE:-nova}
     depends_on:
       postgres:
         condition: service_healthy

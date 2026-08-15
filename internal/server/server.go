@@ -8,10 +8,10 @@ import (
 	"net/http"
 	"time"
 
+	"my-go-app/internal/ai"
 	"my-go-app/internal/auth"
 	"my-go-app/internal/config"
 	"my-go-app/internal/handler"
-	"my-go-app/internal/openai"
 	"my-go-app/internal/repository"
 	"my-go-app/internal/router"
 	"my-go-app/internal/service"
@@ -29,9 +29,18 @@ func New(cfg *config.Config, logger *slog.Logger, db *gorm.DB) *Server {
 	tokens := auth.NewTokenManager(cfg.JWTSecret, cfg.JWTExpiry)
 	users := repository.NewUserRepository(db)
 	tutors := repository.NewTutorRepository(db)
-	ai := openai.NewClient(cfg.OpenAIAPIKey, cfg.OpenAIChatModel, cfg.OpenAITTSModel, cfg.OpenAITTSVoice)
+
+	var provider ai.Provider
+	if cfg.ChatProvider() == "openai" {
+		provider = ai.NewOpenAI(cfg.OpenAIAPIKey, cfg.OpenAIChatModel, cfg.OpenAITTSModel, cfg.OpenAITTSVoice)
+	} else {
+		// gemini (default) — also used for any unrecognized DEFAULT_CHAT_MODEL value
+		provider = ai.NewGemini(cfg.GeminiAPIKey, cfg.GeminiChatModel)
+	}
+	logger.Info("tutor chat provider ready", "provider", provider.Name(), "enabled", provider.Enabled())
+
 	authSvc := service.NewAuthService(users, tokens)
-	tutorSvc := service.NewTutorService(users, tutors, ai)
+	tutorSvc := service.NewTutorService(users, tutors, provider)
 	h := handler.New(logger, db, authSvc, tutorSvc)
 
 	httpHandler := router.New(router.Deps{

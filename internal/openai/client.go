@@ -113,7 +113,6 @@ type transcriptionResponse struct {
 	Error    *apiError `json:"error,omitempty"`
 }
 
-// Transcribe sends audio to Whisper and returns text + detected language code.
 func (c *Client) Transcribe(ctx context.Context, filename string, audio io.Reader) (text, language string, err error) {
 	if !c.Enabled() {
 		return "", "", fmt.Errorf("OPENAI_API_KEY is not set")
@@ -171,7 +170,6 @@ type ttsRequest struct {
 	Voice string `json:"voice"`
 }
 
-// Speak converts text to speech audio bytes (mp3).
 func (c *Client) Speak(ctx context.Context, text string) ([]byte, error) {
 	if !c.Enabled() {
 		return nil, fmt.Errorf("OPENAI_API_KEY is not set")

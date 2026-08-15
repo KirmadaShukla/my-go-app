@@ -8,8 +8,8 @@ import (
 	"io"
 	"strings"
 
+	"my-go-app/internal/ai"
 	"my-go-app/internal/model"
-	"my-go-app/internal/openai"
 	"my-go-app/internal/repository"
 	"my-go-app/internal/tutor"
 	"my-go-app/internal/tutor/prompt"
@@ -26,11 +26,11 @@ var (
 type TutorService struct {
 	users  *repository.UserRepository
 	tutors *repository.TutorRepository
-	ai     *openai.Client
+	ai     ai.Provider
 }
 
-func NewTutorService(users *repository.UserRepository, tutors *repository.TutorRepository, ai *openai.Client) *TutorService {
-	return &TutorService{users: users, tutors: tutors, ai: ai}
+func NewTutorService(users *repository.UserRepository, tutors *repository.TutorRepository, provider ai.Provider) *TutorService {
+	return &TutorService{users: users, tutors: tutors, ai: provider}
 }
 
 type StartSessionInput struct {
@@ -54,7 +54,7 @@ func (s *TutorService) Subjects() []string {
 
 func (s *TutorService) StartSession(ctx context.Context, in StartSessionInput) (*SessionResult, error) {
 	if !s.ai.Enabled() {
-		return nil, fmt.Errorf("%w: OPENAI_API_KEY is not configured", ErrTutorUnavailable)
+		return nil, fmt.Errorf("%w: %s", ErrTutorUnavailable, s.ai.MissingConfig())
 	}
 
 	subject := strings.ToLower(strings.TrimSpace(in.Subject))
@@ -82,14 +82,14 @@ func (s *TutorService) StartSession(ctx context.Context, in StartSessionInput) (
 
 	memorySummary := s.memorySummary(ctx, user.ID, subject)
 
-	// Resume active session for same subject so GPT keeps short-term history.
+	// Resume active session for same subject so the model keeps short-term history.
 	if !in.ForceNew {
 		existing, err := s.tutors.FindLatestActiveSession(ctx, user.ID, subject)
 		if err == nil {
 			if lang != "" {
 				existing.Language = lang
 			}
-			welcomeBack, err := s.ai.Chat(ctx, []openai.ChatMessage{
+			welcomeBack, err := s.ai.Chat(ctx, []ai.ChatMessage{
 				{Role: "system", Content: prompt.Build(prompt.Input{
 					StudentName:   user.Name,
 					ChildAge:      user.ChildAge,
@@ -105,9 +105,9 @@ func (s *TutorService) StartSession(ctx context.Context, in StartSessionInput) (
 				return nil, fmt.Errorf("%w: %v", ErrTutorUnavailable, err)
 			}
 
-			audio, err := s.ai.Speak(ctx, welcomeBack)
+			audioB64, audioMIME, err := s.speakOptional(ctx, welcomeBack)
 			if err != nil {
-				return nil, fmt.Errorf("%w: %v", ErrTutorUnavailable, err)
+				return nil, err
 			}
 
 			if err := s.tutors.AddMessage(ctx, &model.TutorMessage{
@@ -124,8 +124,8 @@ func (s *TutorService) StartSession(ctx context.Context, in StartSessionInput) (
 				Session:     existing,
 				Resumed:     true,
 				Greeting:    welcomeBack,
-				AudioBase64: base64.StdEncoding.EncodeToString(audio),
-				AudioMIME:   "audio/mpeg",
+				AudioBase64: audioB64,
+				AudioMIME:   audioMIME,
 			}, nil
 		}
 		if !errors.Is(err, repository.ErrNotFound) {
@@ -143,7 +143,7 @@ func (s *TutorService) StartSession(ctx context.Context, in StartSessionInput) (
 		return nil, err
 	}
 
-	greeting, err := s.ai.Chat(ctx, []openai.ChatMessage{
+	greeting, err := s.ai.Chat(ctx, []ai.ChatMessage{
 		{Role: "system", Content: prompt.Build(prompt.Input{
 			StudentName:   user.Name,
 			ChildAge:      user.ChildAge,
@@ -159,9 +159,9 @@ func (s *TutorService) StartSession(ctx context.Context, in StartSessionInput) (
 		return nil, fmt.Errorf("%w: %v", ErrTutorUnavailable, err)
 	}
 
-	audio, err := s.ai.Speak(ctx, greeting)
+	audioB64, audioMIME, err := s.speakOptional(ctx, greeting)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrTutorUnavailable, err)
+		return nil, err
 	}
 
 	if err := s.tutors.AddMessage(ctx, &model.TutorMessage{
@@ -178,8 +178,8 @@ func (s *TutorService) StartSession(ctx context.Context, in StartSessionInput) (
 		Session:     session,
 		Resumed:     false,
 		Greeting:    greeting,
-		AudioBase64: base64.StdEncoding.EncodeToString(audio),
-		AudioMIME:   "audio/mpeg",
+		AudioBase64: audioB64,
+		AudioMIME:   audioMIME,
 	}, nil
 }
 
@@ -200,7 +200,7 @@ type VoiceResult struct {
 
 func (s *TutorService) Voice(ctx context.Context, in VoiceInput) (*VoiceResult, error) {
 	if !s.ai.Enabled() {
-		return nil, fmt.Errorf("%w: OPENAI_API_KEY is not configured", ErrTutorUnavailable)
+		return nil, fmt.Errorf("%w: %s", ErrTutorUnavailable, s.ai.MissingConfig())
 	}
 
 	user, session, class, err := s.loadContext(ctx, in.UserID, in.SessionID)
@@ -213,21 +213,17 @@ func (s *TutorService) Voice(ctx context.Context, in VoiceInput) (*VoiceResult, 
 		filename = "speech.webm"
 	}
 
-	studentText, detectedLang, err := s.ai.Transcribe(ctx, filename, in.Audio)
+	audioBytes, err := io.ReadAll(io.LimitReader(in.Audio, 10<<20))
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrTutorUnavailable, err)
+		return nil, fmt.Errorf("%w: read audio: %v", ErrValidation, err)
 	}
-	if studentText == "" {
-		return nil, fmt.Errorf("%w: could not understand the audio", ErrValidation)
+	if len(audioBytes) == 0 {
+		return nil, fmt.Errorf("%w: empty audio", ErrValidation)
 	}
 
 	replyLanguage := session.Language
-	if replyLanguage == "" || replyLanguage == "the student's preferred language" {
-		if detectedLang != "" {
-			replyLanguage = detectedLang
-		} else {
-			replyLanguage = "the same language the student just spoke"
-		}
+	if replyLanguage == "" {
+		replyLanguage = "the student's preferred language"
 	}
 
 	history, err := s.tutors.ListRecentMessages(ctx, session.ID, 20)
@@ -236,32 +232,37 @@ func (s *TutorService) Voice(ctx context.Context, in VoiceInput) (*VoiceResult, 
 	}
 
 	memorySummary := s.memorySummary(ctx, user.ID, session.Subject)
+	system := prompt.Build(prompt.Input{
+		StudentName:   user.Name,
+		ChildAge:      user.ChildAge,
+		ChildClass:    class,
+		Subject:       session.Subject,
+		Language:      replyLanguage,
+		Mode:          prompt.ModeVoice,
+		MemorySummary: memorySummary,
+	})
 
-	messages := []openai.ChatMessage{{
-		Role: "system",
-		Content: prompt.Build(prompt.Input{
-			StudentName:   user.Name,
-			ChildAge:      user.ChildAge,
-			ChildClass:    class,
-			Subject:       session.Subject,
-			Language:      replyLanguage,
-			Mode:          prompt.ModeVoice,
-			MemorySummary: memorySummary,
-		}),
-	}}
+	hist := make([]ai.ChatMessage, 0, len(history))
 	for _, m := range history {
-		messages = append(messages, openai.ChatMessage{Role: m.Role, Content: m.Content})
+		hist = append(hist, ai.ChatMessage{Role: m.Role, Content: m.Content})
 	}
-	messages = append(messages, openai.ChatMessage{Role: "user", Content: studentText})
 
-	reply, err := s.ai.Chat(ctx, messages)
+	studentText, reply, detectedLang, err := s.ai.VoiceTurn(ctx, system, hist, audioBytes, filename)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrTutorUnavailable, err)
 	}
 
-	audio, err := s.ai.Speak(ctx, reply)
+	if replyLanguage == "" || replyLanguage == "the student's preferred language" {
+		if detectedLang != "" {
+			replyLanguage = detectedLang
+		} else {
+			replyLanguage = "the same language the student just spoke"
+		}
+	}
+
+	audioB64, audioMIME, err := s.speakOptional(ctx, reply)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrTutorUnavailable, err)
+		return nil, err
 	}
 
 	if err := s.tutors.AddMessage(ctx, &model.TutorMessage{
@@ -283,7 +284,6 @@ func (s *TutorService) Voice(ctx context.Context, in VoiceInput) (*VoiceResult, 
 		return nil, err
 	}
 
-	// Lightweight rolling memory so future sessions keep subject context.
 	_ = s.tutors.UpsertSubjectMemory(ctx, &model.TutorSubjectMemory{
 		UserID:  user.ID,
 		Subject: session.Subject,
@@ -299,9 +299,20 @@ func (s *TutorService) Voice(ctx context.Context, in VoiceInput) (*VoiceResult, 
 		StudentText: studentText,
 		ReplyText:   reply,
 		Language:    replyLanguage,
-		AudioBase64: base64.StdEncoding.EncodeToString(audio),
-		AudioMIME:   "audio/mpeg",
+		AudioBase64: audioB64,
+		AudioMIME:   audioMIME,
 	}, nil
+}
+
+func (s *TutorService) speakOptional(ctx context.Context, text string) (b64, mime string, err error) {
+	audio, mime, err := s.ai.Speak(ctx, text)
+	if err != nil {
+		return "", "", fmt.Errorf("%w: %v", ErrTutorUnavailable, err)
+	}
+	if len(audio) == 0 {
+		return "", "", nil
+	}
+	return base64.StdEncoding.EncodeToString(audio), mime, nil
 }
 
 func (s *TutorService) memorySummary(ctx context.Context, userID uuid.UUID, subject string) string {
@@ -338,10 +349,11 @@ func (s *TutorService) loadContext(ctx context.Context, userID, sessionID uuid.U
 
 func truncate(s string, n int) string {
 	s = strings.TrimSpace(s)
-	if len(s) <= n {
+	runes := []rune(s)
+	if len(runes) <= n {
 		return s
 	}
-	return s[:n] + "..."
+	return string(runes[:n]) + "..."
 }
 
 func trimMemory(s string) string {

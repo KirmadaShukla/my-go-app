@@ -104,7 +104,10 @@ curl -s -X POST http://localhost:8080/tutor/sessions/<session_id>/voice \
   -F audio=@recording.webm
 ```
 
-Set `OPENAI_API_KEY` in `.env` before using tutor endpoints.
+Set `DEFAULT_CHAT_MODEL` to `gemini` or `openai`, then set the matching API key:
+
+- `gemini` → `GEMINI_API_KEY` (free key from https://aistudio.google.com/apikey). Text-only replies (`audio_base64` empty).
+- `openai` → `OPENAI_API_KEY`. Uses Chat + Whisper + TTS (`audio_base64` populated).
 
 Schema reference: `migrations/000001_tutor_history.up.sql` (applied via GORM AutoMigrate on startup).
 
@@ -115,10 +118,13 @@ Schema reference: `migrations/000001_tutor_history.up.sql` (applied via GORM Aut
 | `DATABASE_URL` | local postgres URL | Postgres DSN for GORM |
 | `JWT_SECRET` | `dev-only-change-me` | Required strong secret in production |
 | `JWT_EXPIRY` | `24h` | Access token lifetime |
-| `OPENAI_API_KEY` | empty | Required for tutor voice |
-| `OPENAI_CHAT_MODEL` | `gpt-4o-mini` | Chat model |
-| `OPENAI_TTS_MODEL` | `tts-1` | Text-to-speech model |
-| `OPENAI_TTS_VOICE` | `nova` | Friendly TTS voice |
+| `DEFAULT_CHAT_MODEL` | `gemini` | Tutor backend: `gemini` or `openai` |
+| `GEMINI_API_KEY` | empty | Required when using Gemini |
+| `GEMINI_CHAT_MODEL` | `gemini-2.5-flash-lite` | Gemini chat model |
+| `OPENAI_API_KEY` | empty | Required when using OpenAI |
+| `OPENAI_CHAT_MODEL` | `gpt-4o-mini` | OpenAI chat model |
+| `OPENAI_TTS_MODEL` | `tts-1` | OpenAI TTS model |
+| `OPENAI_TTS_VOICE` | `nova` | OpenAI TTS voice |
 | `APP_ENV` | `development` | Environment name |
 | `HTTP_ADDR` | `:8080` | Listen address |
 | `LOG_LEVEL` | `info` | `debug`, `info`, `warn`, `error` |

@@ -23,27 +23,36 @@ type Config struct {
 	JWTSecret string
 	JWTExpiry time.Duration
 
+	DefaultChatModel string
+	// OpenAI temporarily unused (kept for rollback).
 	OpenAIAPIKey    string
 	OpenAIChatModel string
 	OpenAITTSModel  string
 	OpenAITTSVoice  string
+
+	// Gemini (active free tutor provider).
+	GeminiAPIKey    string
+	GeminiChatModel string
 }
 
 func Load() (*Config, error) {
 	cfg := &Config{
-		Env:             getEnv("APP_ENV", "development"),
-		HTTPAddr:        getEnv("HTTP_ADDR", ":8080"),
-		ShutdownTimeout: getDuration("SHUTDOWN_TIMEOUT", 15*time.Second),
-		ReadTimeout:     getDuration("HTTP_READ_TIMEOUT", 10*time.Second),
-		WriteTimeout:    getDuration("HTTP_WRITE_TIMEOUT", 120*time.Second),
-		IdleTimeout:     getDuration("HTTP_IDLE_TIMEOUT", 60*time.Second),
-		DatabaseURL:     getEnv("DATABASE_URL", "postgres://pranjalshukla@localhost:5432/mygoapp?sslmode=disable"),
-		JWTSecret:       getEnv("JWT_SECRET", "dev-only-change-me"),
-		JWTExpiry:       getDuration("JWT_EXPIRY", 24*time.Hour),
-		OpenAIAPIKey:    getEnv("OPENAI_API_KEY", ""),
-		OpenAIChatModel: getEnv("OPENAI_CHAT_MODEL", "gpt-4o-mini"),
-		OpenAITTSModel:  getEnv("OPENAI_TTS_MODEL", "tts-1"),
-		OpenAITTSVoice:  getEnv("OPENAI_TTS_VOICE", "nova"),
+		Env:              getEnv("APP_ENV", "development"),
+		HTTPAddr:         getEnv("HTTP_ADDR", ":8080"),
+		ShutdownTimeout:  getDuration("SHUTDOWN_TIMEOUT", 15*time.Second),
+		ReadTimeout:      getDuration("HTTP_READ_TIMEOUT", 10*time.Second),
+		WriteTimeout:     getDuration("HTTP_WRITE_TIMEOUT", 120*time.Second),
+		IdleTimeout:      getDuration("HTTP_IDLE_TIMEOUT", 60*time.Second),
+		DatabaseURL:      getEnv("DATABASE_URL", "postgres://pranjalshukla@localhost:5432/mygoapp?sslmode=disable"),
+		JWTSecret:        getEnv("JWT_SECRET", "dev-only-change-me"),
+		JWTExpiry:        getDuration("JWT_EXPIRY", 24*time.Hour),
+		DefaultChatModel: getEnv("DEFAULT_CHAT_MODEL", "gemini"),
+		OpenAIAPIKey:     getEnv("OPENAI_API_KEY", ""),
+		OpenAIChatModel:  getEnv("OPENAI_CHAT_MODEL", "gpt-4o-mini"),
+		OpenAITTSModel:   getEnv("OPENAI_TTS_MODEL", "tts-1"),
+		OpenAITTSVoice:   getEnv("OPENAI_TTS_VOICE", "nova"),
+		GeminiAPIKey:     getEnv("GEMINI_API_KEY", ""),
+		GeminiChatModel:  getEnv("GEMINI_CHAT_MODEL", "gemini-2.5-flash-lite"),
 	}
 
 	level, err := parseLogLevel(getEnv("LOG_LEVEL", "info"))
@@ -80,6 +89,18 @@ func (c *Config) validate() error {
 
 func (c *Config) IsProduction() bool {
 	return strings.EqualFold(c.Env, "production")
+}
+
+// ChatProvider returns the normalized tutor backend: "openai" or "gemini".
+func (c *Config) ChatProvider() string {
+	switch strings.ToLower(strings.TrimSpace(c.DefaultChatModel)) {
+	case "openAI", "chatgpt", "gpt":
+		return "openai"
+	case "gemini", "google", "":
+		return "gemini"
+	default:
+		return strings.ToLower(strings.TrimSpace(c.DefaultChatModel))
+	}
 }
 
 func getEnv(key, fallback string) string {
